@@ -1,5 +1,6 @@
 package com.personalspace.api.service;
 
+import com.personalspace.api.dto.response.UserResponse;
 import com.personalspace.api.exception.ResourceNotFoundException;
 import com.personalspace.api.model.entity.User;
 import com.personalspace.api.repository.UserRepository;
@@ -24,5 +25,10 @@ public class UserService {
     public User getUserByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
+    }
+
+    public UserResponse getProfile(String email) {
+        User user = getUserByEmail(email);
+        return new UserResponse(user.getName(), user.getEmail());
     }
 }

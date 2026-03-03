@@ -47,7 +47,7 @@ class AuthControllerTest {
     @Test
     void signup_shouldReturn201_whenRequestIsValid() throws Exception {
         SignupRequest request = new SignupRequest("Test", "test@test.com", "password123");
-        AuthResponse authResponse = new AuthResponse("access-token", "refresh-token", 900000L);
+        AuthResponse authResponse = new AuthResponse("access-token", "refresh-token", 900000L, "Test", "test@test.com");
 
         when(authService.signup(any(SignupRequest.class))).thenReturn(authResponse);
 
@@ -86,7 +86,7 @@ class AuthControllerTest {
     @Test
     void login_shouldReturn200_whenCredentialsAreValid() throws Exception {
         LoginRequest request = new LoginRequest("test@test.com", "password123");
-        AuthResponse authResponse = new AuthResponse("access-token", "refresh-token", 900000L);
+        AuthResponse authResponse = new AuthResponse("access-token", "refresh-token", 900000L, "Test", "test@test.com");
 
         when(authService.login(any(LoginRequest.class))).thenReturn(authResponse);
 
