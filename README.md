@@ -10,6 +10,10 @@ Built with Java 21, Spring Boot 4.0.3, and PostgreSQL.
 - Login with JWT access + refresh token issuance
 - Token refresh with automatic rotation
 - Logout via refresh token invalidation
+- Notes CRUD with pagination (pinned first, then by recency)
+- Full-text search on note title and content (case-insensitive)
+- Pin and archive (soft delete) toggle for notes
+- Labels with many-to-many relationship to notes
 - Input validation with descriptive error messages
 - BCrypt password hashing
 
@@ -132,6 +136,90 @@ Invalidate a refresh token.
 
 **Response:** 204 No Content
 
+## Notes API (authenticated — requires Bearer token)
+
+### POST `/api/notes`
+
+Create a new note.
+
+**Request body:**
+```json
+{
+  "title": "My Note",
+  "content": "<p>HTML content</p>",
+  "pinned": false,
+  "labelIds": ["uuid-of-label"]
+}
+```
+
+**Response (201):**
+```json
+{
+  "id": "note-uuid",
+  "title": "My Note",
+  "content": "<p>HTML content</p>",
+  "pinned": false,
+  "archived": false,
+  "labels": [{"id": "label-uuid", "name": "Work", "createdAt": "..."}],
+  "createdAt": "...",
+  "updatedAt": "..."
+}
+```
+
+### GET `/api/notes?archived=false&page=0&size=10`
+
+List notes with pagination. Pinned notes appear first, then sorted by recency.
+
+### GET `/api/notes/{id}`
+
+Get a single note by ID. Returns 404 if not found or not owned by user.
+
+### PUT `/api/notes/{id}`
+
+Update a note. Request body same shape as create, with optional `archived` field.
+
+### DELETE `/api/notes/{id}`
+
+Hard delete a note. Returns 204 No Content.
+
+### GET `/api/notes/search?q=keyword&archived=false&page=0&size=10`
+
+Search notes by title or content (case-insensitive). Blank query returns all notes.
+
+### PATCH `/api/notes/{id}/pin`
+
+Toggle the pinned status of a note.
+
+### PATCH `/api/notes/{id}/archive`
+
+Toggle the archived status of a note.
+
+## Labels API (authenticated — requires Bearer token)
+
+### POST `/api/labels`
+
+**Request body:**
+```json
+{ "name": "Work" }
+```
+
+**Response (201):**
+```json
+{ "id": "label-uuid", "name": "Work", "createdAt": "..." }
+```
+
+### GET `/api/labels`
+
+Returns all labels for the authenticated user, sorted alphabetically.
+
+### PUT `/api/labels/{id}`
+
+Update label name. Returns 409 if duplicate name.
+
+### DELETE `/api/labels/{id}`
+
+Delete a label (removes it from all associated notes). Returns 204.
+
 ### Error responses
 
 All errors return a consistent format:
@@ -153,7 +241,7 @@ All errors return a consistent format:
 | 400 | Validation failure (missing/invalid fields) |
 | 401 | Wrong password or invalid/expired refresh token |
 | 404 | Resource not found |
-| 409 | Email already registered |
+| 409 | Email already registered / Duplicate label name |
 
 ## Running Tests
 

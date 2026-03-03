@@ -47,6 +47,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
     }
 
+    @ExceptionHandler(DuplicateNoteLabelException.class)
+    public ResponseEntity<ApiErrorResponse> handleDuplicateNoteLabel(DuplicateNoteLabelException ex) {
+        ApiErrorResponse response = new ApiErrorResponse(
+                HttpStatus.CONFLICT.value(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleResourceNotFound(ResourceNotFoundException ex) {
         ApiErrorResponse response = new ApiErrorResponse(

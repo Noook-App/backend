@@ -6,7 +6,7 @@ This guide walks through every folder and file in the project. It assumes no pri
 
 ## What This Project Is
 
-A REST API that handles user authentication — signing up, logging in, refreshing tokens, and logging out. It's built with:
+A REST API that handles user authentication, notes management with search/pin/archive, and labels. It's built with:
 
 - **Java 21** — the programming language
 - **Spring Boot 4.0.3** — a framework that handles all the plumbing (HTTP server, database connections, dependency injection, security) so you can focus on business logic
@@ -82,7 +82,7 @@ The entry point. `@SpringBootApplication` tells Spring to scan this package and 
 **What controllers do**: They receive HTTP requests, validate the input, call a service, and return an HTTP response. They don't contain business logic.
 
 #### `AuthController.java`
-The only controller. It defines four endpoints, all under `/api/auth`:
+Defines four endpoints, all under `/api/auth`:
 
 | Annotation | Method | What It Does |
 |---|---|---|
@@ -98,6 +98,30 @@ Key annotations:
 - `@RequestBody` — tells Spring to parse the incoming JSON body into the specified Java object
 
 The controller has one dependency (`AuthService`) injected through its constructor. Spring automatically provides the right instance — this is **dependency injection**.
+
+#### `NoteController.java`
+Defines eight endpoints under `/api/notes` for note CRUD, search, pin, and archive. All endpoints require authentication via `Principal` (resolved from the JWT security context). Uses `@Valid` for request body validation.
+
+| Annotation | Method | What It Does |
+|---|---|---|
+| `@PostMapping` | `createNote()` | Creates a note, returns 201 |
+| `@GetMapping` | `getNotes()` | Lists paginated notes (pinned first) |
+| `@GetMapping("/{id}")` | `getNote()` | Gets a single note |
+| `@PutMapping("/{id}")` | `updateNote()` | Updates a note |
+| `@DeleteMapping("/{id}")` | `deleteNote()` | Hard deletes a note, returns 204 |
+| `@GetMapping("/search")` | `searchNotes()` | Searches notes by title/content |
+| `@PatchMapping("/{id}/pin")` | `togglePin()` | Toggles pinned status |
+| `@PatchMapping("/{id}/archive")` | `toggleArchive()` | Toggles archived status |
+
+#### `LabelController.java`
+Defines four endpoints under `/api/labels` for label CRUD. Uses the same `Principal` auth pattern.
+
+| Annotation | Method | What It Does |
+|---|---|---|
+| `@PostMapping` | `createLabel()` | Creates a label, returns 201 |
+| `@GetMapping` | `getLabels()` | Lists all user's labels alphabetically |
+| `@PutMapping("/{id}")` | `updateLabel()` | Updates label name |
+| `@DeleteMapping("/{id}")` | `deleteLabel()` | Deletes label + removes from notes, returns 204 |
 
 ---
 
@@ -131,6 +155,24 @@ The signing key is created from the `jwt.secret` property using HMAC-SHA.
 #### `UserService.java`
 A simple service for looking up users by ID or email. Used outside the auth flow when other parts of the app need to fetch a user. Throws `ResourceNotFoundException` if not found.
 
+#### `NoteService.java`
+Handles all note operations:
+- **`createNote()`** — resolves label IDs (validates ownership), saves note
+- **`getNote()`** — ownership-scoped fetch, returns 404 for other users' notes
+- **`getNotes()`** — paginated list sorted by pinned desc + createdAt desc, filtered by archived flag
+- **`updateNote()`** — updates all fields including labels
+- **`deleteNote()`** — ownership-scoped hard delete
+- **`togglePin()` / `toggleArchive()`** — flip boolean fields
+- **`searchNotes()`** — case-insensitive LIKE search on title and content; blank query falls back to `getNotes()`
+- Private helpers: `resolveLabels()`, `toNoteResponse()`, `toPaginatedResponse()`
+
+#### `LabelService.java`
+Handles label CRUD:
+- **`createLabel()`** — checks for duplicate name per user, saves
+- **`getLabels()`** — returns all labels alphabetically
+- **`updateLabel()`** — checks ownership + duplicate name
+- **`deleteLabel()`** — removes label from all associated notes (bidirectional ManyToMany cleanup), then deletes
+
 ---
 
 ### `repository/` — Database Access
@@ -159,6 +201,29 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
 - `deleteByUser_Id` — the underscore tells Spring to traverse the relationship: `RefreshToken.user.id`
 - `deleteByToken` — deletes the row where the token column matches
 
+#### `NoteRepository.java`
+```java
+public interface NoteRepository extends JpaRepository<Note, UUID> {
+    Optional<Note> findByIdAndUser(UUID id, User user);
+    Page<Note> findByUserAndArchived(User user, boolean archived, Pageable pageable);
+    @Query("...") Page<Note> searchByUserAndQuery(User user, String query, boolean archived, Pageable pageable);
+}
+```
+- `findByIdAndUser` — ownership-scoped lookup (returns empty for other users' notes — 404 not 403)
+- `findByUserAndArchived` — paginated list with archived filter
+- `searchByUserAndQuery` — custom `@Query` using `LOWER()` + `LIKE` for cross-DB compatibility (works on both PostgreSQL and H2)
+
+#### `LabelRepository.java`
+```java
+public interface LabelRepository extends JpaRepository<Label, UUID> {
+    List<Label> findAllByUserOrderByNameAsc(User user);
+    boolean existsByNameAndUser(String name, User user);
+    Optional<Label> findByIdAndUser(UUID id, User user);
+}
+```
+- `findAllByUserOrderByNameAsc` — lists labels alphabetically for a user
+- `existsByNameAndUser` — duplicate check before create/update
+
 ---
 
 ### `model/entity/` — Database Tables as Java Classes
@@ -186,6 +251,36 @@ Key annotations:
 - `@Enumerated(EnumType.STRING)` — stores the enum as its name (`"USER"`) rather than its ordinal (`0`)
 - `@PrePersist` — method runs automatically before the first `save()` (sets `createdAt` and `updatedAt`)
 - `@PreUpdate` — method runs automatically before every subsequent `save()` (updates `updatedAt`)
+
+#### `Note.java`
+Maps to the `notes` table. Fields:
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key, auto-generated |
+| `title` | String | Not null, max 255 chars |
+| `content` | String | TEXT column, stores HTML |
+| `pinned` | boolean | Default false |
+| `archived` | boolean | Default false (soft delete) |
+| `user` | User | Many-to-one (LAZY), foreign key |
+| `labels` | Set\<Label> | Many-to-many via `note_labels` join table |
+| `createdAt` | Instant | Set on creation |
+| `updatedAt` | Instant | Set on creation and every update |
+
+Uses `@PrePersist` and `@PreUpdate` lifecycle callbacks (same pattern as `User`). The `labels` field uses `Set<Label>` to avoid Hibernate bag issues.
+
+#### `Label.java`
+Maps to the `labels` table. Fields:
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key, auto-generated |
+| `name` | String | Not null, max 50 chars |
+| `user` | User | Many-to-one (LAZY), foreign key |
+| `createdAt` | Instant | Set on creation |
+| `notes` | Set\<Note> | Bidirectional ManyToMany (mappedBy="labels") |
+
+Has a unique constraint on `(name, user_id)` — each user's labels must have unique names. The bidirectional `notes` relationship is needed for cleanup when deleting a label.
 
 #### `RefreshToken.java`
 Maps to the `refresh_tokens` table. Fields:
@@ -229,6 +324,18 @@ Fields: `email` (`@Email`, `@NotBlank`), `password` (`@NotBlank`)
 #### `RefreshTokenRequest.java`
 Field: `refreshToken` (`@NotBlank`)
 
+#### `CreateNoteRequest.java`
+Fields: `title` (`@NotBlank`, `@Size(max=255)`), `content`, `pinned` (Boolean), `labelIds` (List\<UUID>)
+
+#### `UpdateNoteRequest.java`
+Fields: `title` (`@NotBlank`, `@Size(max=255)`), `content`, `pinned`, `archived`, `labelIds`
+
+#### `CreateLabelRequest.java`
+Field: `name` (`@NotBlank`, `@Size(max=50)`)
+
+#### `UpdateLabelRequest.java`
+Field: `name` (`@NotBlank`, `@Size(max=50)`)
+
 ---
 
 ### `dto/response/` — Outgoing JSON Shapes
@@ -256,6 +363,18 @@ Returned by `GlobalExceptionHandler` on any error. Shape:
 }
 ```
 Has convenience constructors that auto-set `timestamp` to now and allow `errors` to be null (for non-validation errors).
+
+#### `NoteResponse.java`
+Returned by all note endpoints. Shape: `id`, `title`, `content`, `pinned`, `archived`, `labels` (list of `LabelResponse`), `createdAt`, `updatedAt`.
+
+#### `LabelResponse.java`
+Returned by label endpoints. Shape: `id`, `name`, `createdAt`.
+
+#### `PaginatedResponse.java`
+Generic wrapper for paginated results: `content` (list), `page`, `size`, `totalElements`, `totalPages`. Decouples the API contract from Spring's `Page` internals.
+
+#### `UserResponse.java`
+Returned by the user profile endpoint. Shape: `name`, `email`.
 
 ---
 
@@ -318,9 +437,10 @@ All handlers return an `ApiErrorResponse` for a consistent JSON error format.
 #### Custom Exception Classes
 - `EmailAlreadyExistsException` — thrown by `AuthService.signup()`
 - `RefreshTokenException` — thrown by `AuthService.refresh()`
-- `ResourceNotFoundException` — thrown by `UserService`
+- `ResourceNotFoundException` — thrown by `UserService`, `NoteService`, `LabelService`
+- `DuplicateLabelException` — thrown by `LabelService` when label name conflicts (mapped to 409)
 
-All three extend `RuntimeException`, so they don't need to be declared in method signatures.
+All four extend `RuntimeException`, so they don't need to be declared in method signatures.
 
 ---
 
@@ -356,6 +476,24 @@ Plain JUnit 5, no Spring annotations. Constructs `JwtService` directly with a te
 #### `UserRepositoryTest.java` — Database query tests
 Uses `@DataJpaTest` — loads only the JPA layer with an in-memory H2 database. Tests verify that `findByEmail()` and `existsByEmail()` actually generate correct SQL queries.
 
+#### `NoteControllerTest.java` — Note HTTP layer tests
+Uses `@WebMvcTest(controllers = NoteController.class)` with security excluded and `addFilters = false`. Uses `Principal` mock to simulate authenticated user. Tests: create 201, create 400, getNotes 200, getNote 200/404, update 200, delete 204, search 200, togglePin 200, toggleArchive 200.
+
+#### `LabelControllerTest.java` — Label HTTP layer tests
+Same pattern. Tests: create 201/400/409, getLabels 200, update 200, delete 204.
+
+#### `NoteServiceTest.java` — Note business logic tests
+Uses `@ExtendWith(MockitoExtension.class)`. Tests: create (with/without labels, invalid labelId), getNote (success/not found), getNotes, update, delete, togglePin, toggleArchive, search (with query/blank).
+
+#### `LabelServiceTest.java` — Label business logic tests
+Same pattern. Tests: create (success/duplicate), getLabels, update (success/not found/duplicate), delete (success/not found).
+
+#### `NoteRepositoryTest.java` — Note DB query tests
+Uses `@DataJpaTest`. Tests: findByIdAndUser ownership, findByUserAndArchived filtering + pagination, searchByUserAndQuery case-insensitive matching + user isolation.
+
+#### `LabelRepositoryTest.java` — Label DB query tests
+Uses `@DataJpaTest`. Tests: findAllByUser ordering, existsByNameAndUser, findByIdAndUser ownership isolation.
+
 #### `ApiApplicationTests.java` — Smoke test
 Uses `@SpringBootTest` — loads the entire application context. Just verifies the app starts without errors.
 
@@ -372,18 +510,27 @@ api/
      |   |- java/com/personalspace/api/
      |   |   |- ApiApplication.java           Entry point
      |   |   |- controller/
-     |   |   |   |- AuthController.java       HTTP endpoints
+     |   |   |   |- AuthController.java       Auth HTTP endpoints
+     |   |   |   |- NoteController.java       Note CRUD/search/pin/archive
+     |   |   |   |- LabelController.java      Label CRUD
+     |   |   |   |- UserController.java       User profile
      |   |   |- service/
      |   |   |   |- AuthService.java          Auth business logic
      |   |   |   |- JwtService.java           Token generation/validation
      |   |   |   |- UserService.java          User lookups
+     |   |   |   |- NoteService.java          Note business logic
+     |   |   |   |- LabelService.java         Label business logic
      |   |   |- repository/
      |   |   |   |- UserRepository.java       User DB queries
      |   |   |   |- RefreshTokenRepository.java  Token DB queries
+     |   |   |   |- NoteRepository.java       Note DB queries + search
+     |   |   |   |- LabelRepository.java      Label DB queries
      |   |   |- model/
      |   |   |   |- entity/
      |   |   |   |   |- User.java             Users table
      |   |   |   |   |- RefreshToken.java     Refresh tokens table
+     |   |   |   |   |- Note.java             Notes table (ManyToMany labels)
+     |   |   |   |   |- Label.java            Labels table (unique per user)
      |   |   |   |- enums/
      |   |   |       |- Role.java             USER (expandable)
      |   |   |- dto/
@@ -391,9 +538,17 @@ api/
      |   |   |   |   |- SignupRequest.java     Signup input shape
      |   |   |   |   |- LoginRequest.java      Login input shape
      |   |   |   |   |- RefreshTokenRequest.java  Refresh/logout input
+     |   |   |   |   |- CreateNoteRequest.java    Note creation input
+     |   |   |   |   |- UpdateNoteRequest.java    Note update input
+     |   |   |   |   |- CreateLabelRequest.java   Label creation input
+     |   |   |   |   |- UpdateLabelRequest.java   Label update input
      |   |   |   |- response/
      |   |   |       |- AuthResponse.java      Token response shape
      |   |   |       |- ApiErrorResponse.java  Error response shape
+     |   |   |       |- NoteResponse.java      Note response shape
+     |   |   |       |- LabelResponse.java     Label response shape
+     |   |   |       |- PaginatedResponse.java Generic paginated wrapper
+     |   |   |       |- UserResponse.java      User profile response
      |   |   |- security/
      |   |   |   |- SecurityConfig.java        Security rules + beans
      |   |   |   |- JwtAuthenticationFilter.java  Per-request token check
@@ -403,18 +558,25 @@ api/
      |   |       |- EmailAlreadyExistsException.java
      |   |       |- RefreshTokenException.java
      |   |       |- ResourceNotFoundException.java
+     |   |       |- DuplicateLabelException.java
      |   |- resources/
      |       |- application.properties        App configuration
      |- test/
          |- java/com/personalspace/api/
          |   |- ApiApplicationTests.java      Smoke test
          |   |- controller/
-         |   |   |- AuthControllerTest.java   HTTP layer tests
+         |   |   |- AuthControllerTest.java   Auth HTTP layer tests
+         |   |   |- NoteControllerTest.java   Note HTTP layer tests
+         |   |   |- LabelControllerTest.java  Label HTTP layer tests
          |   |- service/
-         |   |   |- AuthServiceTest.java      Business logic tests
+         |   |   |- AuthServiceTest.java      Auth business logic tests
          |   |   |- JwtServiceTest.java       Token tests
+         |   |   |- NoteServiceTest.java      Note business logic tests
+         |   |   |- LabelServiceTest.java     Label business logic tests
          |   |- repository/
-         |       |- UserRepositoryTest.java   DB query tests
+         |       |- UserRepositoryTest.java   User DB query tests
+         |       |- NoteRepositoryTest.java   Note DB query tests
+         |       |- LabelRepositoryTest.java  Label DB query tests
          |- resources/
              |- application-test.properties   H2 test database config
 ```

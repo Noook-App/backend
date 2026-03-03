@@ -46,13 +46,15 @@ Separate `dto/request/` and `dto/response/` packages. All DTOs are Java records 
 | `EmailAlreadyExistsException` | 409 CONFLICT | :30 |
 | `BadCredentialsException` | 401 UNAUTHORIZED | :37 |
 | `RefreshTokenException` | 401 UNAUTHORIZED | :44 |
-| `ResourceNotFoundException` | 404 NOT_FOUND | :51 |
-| `Exception` (catch-all) | 500 INTERNAL_SERVER_ERROR | :58 |
+| `DuplicateNoteLabelException` | 409 CONFLICT | :50 |
+| `ResourceNotFoundException` | 404 NOT_FOUND | :57 |
+| `Exception` (catch-all) | 500 INTERNAL_SERVER_ERROR | :64 |
 
 Custom exceptions extend `RuntimeException`:
 - `EmailAlreadyExistsException` (exception/EmailAlreadyExistsException.java:3)
 - `RefreshTokenException` (exception/RefreshTokenException.java:3)
 - `ResourceNotFoundException` (exception/ResourceNotFoundException.java:3)
+- `DuplicateNoteLabelException` (exception/DuplicateNoteLabelException.java:3)
 
 ## JWT Security Filter Chain
 
@@ -110,6 +112,42 @@ Three testing patterns used across the project:
 - Tests query derivation methods against in-memory database
 
 All test classes use `@ActiveProfiles("test")` to load `application-test.properties`.
+
+## ManyToMany Pattern (Notes <-> NoteLabels)
+
+Notes and NoteLabels have a bidirectional ManyToMany relationship:
+
+- **Owning side**: `Note.labels` (model/entity/Note.java) — defines `@JoinTable(name = "note_label_mappings")`
+- **Inverse side**: `NoteLabel.notes` (model/entity/NoteLabel.java) — uses `mappedBy = "labels"`
+- Uses `Set<NoteLabel>` / `Set<Note>` to avoid Hibernate bag issues and duplicate join rows
+- Bidirectional relationship on NoteLabel is required for cleanup: when deleting a label, `NoteLabelService.deleteLabel()` iterates `label.getNotes()` and removes the label from each note's labels set before deleting
+
+## Pagination Pattern
+
+Paginated endpoints use a generic `PaginatedResponse<T>` (dto/response/PaginatedResponse.java) that wraps Spring's `Page`:
+- `content` (List), `page`, `size`, `totalElements`, `totalPages`
+- Conversion from `Page<Note>` to `PaginatedResponse<NoteResponse>` happens in `NoteService.toPaginatedResponse()`
+- Default sort: `Sort.by(Sort.Order.desc("pinned"), Sort.Order.desc("createdAt"))` — pinned notes always appear first
+- Default page size: 10, configurable via `?page=0&size=10` query params
+
+## Search Pattern
+
+Case-insensitive search using JPQL `LOWER()` + `LIKE` (not PostgreSQL-specific `ILIKE`):
+
+```java
+@Query("SELECT n FROM Note n WHERE n.user = :user AND n.archived = :archived " +
+    "AND (LOWER(n.title) LIKE LOWER(CONCAT('%', :query, '%')) " +
+    "OR LOWER(n.content) LIKE LOWER(CONCAT('%', :query, '%')))")
+```
+
+This approach works on both PostgreSQL (prod) and H2 (test). Blank queries fall back to the non-search paginated query.
+
+## Ownership Isolation Pattern
+
+All note/label queries are scoped by user using `findByIdAndUser(UUID id, User user)`:
+- Returns `Optional.empty()` if the resource belongs to another user (or doesn't exist)
+- Service layer throws `ResourceNotFoundException` in both cases → 404 response
+- This prevents information leakage about resource existence (404 not 403)
 
 ## Entity Timestamps
 
