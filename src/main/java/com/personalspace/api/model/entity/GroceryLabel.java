@@ -29,9 +29,6 @@ public class GroceryLabel {
     @ManyToMany(mappedBy = "labels")
     private Set<GroceryList> groceryLists = new HashSet<>();
 
-    @ManyToMany(mappedBy = "labels")
-    private Set<GroceryItem> groceryItems = new HashSet<>();
-
     @PrePersist
     protected void onCreate() {
         createdAt = Instant.now();
@@ -53,6 +50,4 @@ public class GroceryLabel {
     public Set<GroceryList> getGroceryLists() { return groceryLists; }
     public void setGroceryLists(Set<GroceryList> groceryLists) { this.groceryLists = groceryLists; }
 
-    public Set<GroceryItem> getGroceryItems() { return groceryItems; }
-    public void setGroceryItems(Set<GroceryItem> groceryItems) { this.groceryItems = groceryItems; }
 }

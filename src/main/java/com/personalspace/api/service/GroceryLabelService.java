@@ -70,7 +70,6 @@ public class GroceryLabelService {
                 .orElseThrow(() -> new ResourceNotFoundException("Label not found with id: " + labelId));
 
         label.getGroceryLists().forEach(list -> list.getLabels().remove(label));
-        label.getGroceryItems().forEach(item -> item.getLabels().remove(label));
 
         groceryLabelRepository.delete(label);
     }
