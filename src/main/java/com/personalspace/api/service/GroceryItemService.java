@@ -6,11 +6,11 @@ import com.personalspace.api.dto.response.GroceryItemResponse;
 import com.personalspace.api.dto.response.GroceryLabelResponse;
 import com.personalspace.api.exception.ResourceNotFoundException;
 import com.personalspace.api.model.entity.GroceryItem;
-import com.personalspace.api.model.entity.GroceryLabel;
+import com.personalspace.api.model.entity.GroceryItemLabel;
 import com.personalspace.api.model.entity.GroceryList;
 import com.personalspace.api.model.entity.User;
+import com.personalspace.api.repository.GroceryItemLabelRepository;
 import com.personalspace.api.repository.GroceryItemRepository;
-import com.personalspace.api.repository.GroceryLabelRepository;
 import com.personalspace.api.repository.GroceryListRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,16 +23,16 @@ public class GroceryItemService {
 
     private final GroceryItemRepository groceryItemRepository;
     private final GroceryListRepository groceryListRepository;
-    private final GroceryLabelRepository groceryLabelRepository;
+    private final GroceryItemLabelRepository groceryItemLabelRepository;
     private final UserService userService;
 
     public GroceryItemService(GroceryItemRepository groceryItemRepository,
                               GroceryListRepository groceryListRepository,
-                              GroceryLabelRepository groceryLabelRepository,
+                              GroceryItemLabelRepository groceryItemLabelRepository,
                               UserService userService) {
         this.groceryItemRepository = groceryItemRepository;
         this.groceryListRepository = groceryListRepository;
-        this.groceryLabelRepository = groceryLabelRepository;
+        this.groceryItemLabelRepository = groceryItemLabelRepository;
         this.userService = userService;
     }
 
@@ -103,21 +103,15 @@ public class GroceryItemService {
         item.setChecked(!item.isChecked());
         GroceryItem saved = groceryItemRepository.save(item);
 
-        // Auto-archive: if item was just checked and no unchecked items remain
-        if (saved.isChecked() && !groceryItemRepository.existsByGroceryListAndCheckedFalse(list)) {
-            list.setArchived(true);
-            groceryListRepository.save(list);
-        }
-
         return toGroceryItemResponse(saved);
     }
 
-    private Set<GroceryLabel> resolveLabels(List<UUID> labelIds, User user) {
+    private Set<GroceryItemLabel> resolveLabels(List<UUID> labelIds, User user) {
         if (labelIds == null || labelIds.isEmpty()) {
             return new HashSet<>();
         }
         return labelIds.stream()
-                .map(id -> groceryLabelRepository.findByIdAndUser(id, user)
+                .map(id -> groceryItemLabelRepository.findByIdAndUser(id, user)
                         .orElseThrow(() -> new ResourceNotFoundException("Label not found with id: " + id)))
                 .collect(Collectors.toSet());
     }

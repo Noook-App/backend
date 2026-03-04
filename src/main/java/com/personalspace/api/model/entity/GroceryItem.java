@@ -30,9 +30,9 @@ public class GroceryItem {
     @JoinTable(
             name = "grocery_item_label_mappings",
             joinColumns = @JoinColumn(name = "grocery_item_id"),
-            inverseJoinColumns = @JoinColumn(name = "grocery_label_id")
+            inverseJoinColumns = @JoinColumn(name = "grocery_item_label_id")
     )
-    private Set<GroceryLabel> labels = new HashSet<>();
+    private Set<GroceryItemLabel> labels = new HashSet<>();
 
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
@@ -68,8 +68,8 @@ public class GroceryItem {
     public GroceryList getGroceryList() { return groceryList; }
     public void setGroceryList(GroceryList groceryList) { this.groceryList = groceryList; }
 
-    public Set<GroceryLabel> getLabels() { return labels; }
-    public void setLabels(Set<GroceryLabel> labels) { this.labels = labels; }
+    public Set<GroceryItemLabel> getLabels() { return labels; }
+    public void setLabels(Set<GroceryItemLabel> labels) { this.labels = labels; }
 
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }

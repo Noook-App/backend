@@ -9,9 +9,11 @@ import com.personalspace.api.dto.response.GroceryListResponse;
 import com.personalspace.api.dto.response.PaginatedResponse;
 import com.personalspace.api.exception.ResourceNotFoundException;
 import com.personalspace.api.model.entity.GroceryItem;
+import com.personalspace.api.model.entity.GroceryItemLabel;
 import com.personalspace.api.model.entity.GroceryLabel;
 import com.personalspace.api.model.entity.GroceryList;
 import com.personalspace.api.model.entity.User;
+import com.personalspace.api.repository.GroceryItemLabelRepository;
 import com.personalspace.api.repository.GroceryItemRepository;
 import com.personalspace.api.repository.GroceryLabelRepository;
 import com.personalspace.api.repository.GroceryListRepository;
@@ -31,15 +33,18 @@ public class GroceryListService {
     private final GroceryListRepository groceryListRepository;
     private final GroceryItemRepository groceryItemRepository;
     private final GroceryLabelRepository groceryLabelRepository;
+    private final GroceryItemLabelRepository groceryItemLabelRepository;
     private final UserService userService;
 
     public GroceryListService(GroceryListRepository groceryListRepository,
                               GroceryItemRepository groceryItemRepository,
                               GroceryLabelRepository groceryLabelRepository,
+                              GroceryItemLabelRepository groceryItemLabelRepository,
                               UserService userService) {
         this.groceryListRepository = groceryListRepository;
         this.groceryItemRepository = groceryItemRepository;
         this.groceryLabelRepository = groceryLabelRepository;
+        this.groceryItemLabelRepository = groceryItemLabelRepository;
         this.userService = userService;
     }
 
@@ -58,7 +63,7 @@ public class GroceryListService {
                 item.setName(itemRequest.name());
                 item.setQuantity(itemRequest.quantity());
                 item.setGroceryList(list);
-                item.setLabels(resolveLabels(itemRequest.labelIds(), user));
+                item.setLabels(resolveItemLabels(itemRequest.labelIds(), user));
                 list.getItems().add(item);
             }
         }
@@ -128,6 +133,16 @@ public class GroceryListService {
         }
         return labelIds.stream()
                 .map(id -> groceryLabelRepository.findByIdAndUser(id, user)
+                        .orElseThrow(() -> new ResourceNotFoundException("Label not found with id: " + id)))
+                .collect(Collectors.toSet());
+    }
+
+    private Set<GroceryItemLabel> resolveItemLabels(List<UUID> labelIds, User user) {
+        if (labelIds == null || labelIds.isEmpty()) {
+            return new HashSet<>();
+        }
+        return labelIds.stream()
+                .map(id -> groceryItemLabelRepository.findByIdAndUser(id, user)
                         .orElseThrow(() -> new ResourceNotFoundException("Label not found with id: " + id)))
                 .collect(Collectors.toSet());
     }
