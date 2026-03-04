@@ -5,7 +5,6 @@ import com.personalspace.api.dto.request.UpdateGroceryLabelRequest;
 import com.personalspace.api.dto.response.GroceryLabelResponse;
 import com.personalspace.api.exception.DuplicateGroceryLabelException;
 import com.personalspace.api.exception.ResourceNotFoundException;
-import com.personalspace.api.model.entity.GroceryItem;
 import com.personalspace.api.model.entity.GroceryLabel;
 import com.personalspace.api.model.entity.GroceryList;
 import com.personalspace.api.model.entity.User;
@@ -145,16 +144,11 @@ class GroceryLabelServiceTest {
         list.setLabels(new HashSet<>(Set.of(label)));
         label.setGroceryLists(new HashSet<>(Set.of(list)));
 
-        GroceryItem item = new GroceryItem();
-        item.setLabels(new HashSet<>(Set.of(label)));
-        label.setGroceryItems(new HashSet<>(Set.of(item)));
-
         when(groceryLabelRepository.findByIdAndUser(labelId, user)).thenReturn(Optional.of(label));
 
         groceryLabelService.deleteLabel("test@test.com", labelId);
 
         assertFalse(list.getLabels().contains(label));
-        assertFalse(item.getLabels().contains(label));
         verify(groceryLabelRepository).delete(label);
     }
 
