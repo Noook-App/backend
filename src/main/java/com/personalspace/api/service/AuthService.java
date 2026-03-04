@@ -61,7 +61,7 @@ public class AuthService {
         String accessToken = jwtService.generateAccessToken(user.getEmail());
         String refreshToken = createRefreshToken(user).getToken();
 
-        return new AuthResponse(accessToken, refreshToken, jwtService.getAccessTokenExpiration(), user.getName(), user.getEmail());
+        return new AuthResponse(accessToken, refreshToken, jwtService.getAccessTokenExpiration() / 1000, user.getName(), user.getEmail());
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -74,7 +74,7 @@ public class AuthService {
         String accessToken = jwtService.generateAccessToken(user.getEmail());
         String refreshToken = createRefreshToken(user).getToken();
 
-        return new AuthResponse(accessToken, refreshToken, jwtService.getAccessTokenExpiration(), user.getName(), user.getEmail());
+        return new AuthResponse(accessToken, refreshToken, jwtService.getAccessTokenExpiration() / 1000, user.getName(), user.getEmail());
     }
 
     @Transactional
@@ -95,7 +95,7 @@ public class AuthService {
         String accessToken = jwtService.generateAccessToken(user.getEmail());
         String newRefreshToken = createRefreshToken(user).getToken();
 
-        return new AuthResponse(accessToken, newRefreshToken, jwtService.getAccessTokenExpiration(), user.getName(), user.getEmail());
+        return new AuthResponse(accessToken, newRefreshToken, jwtService.getAccessTokenExpiration() / 1000, user.getName(), user.getEmail());
     }
 
     @Transactional

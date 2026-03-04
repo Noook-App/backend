@@ -47,14 +47,16 @@ Separate `dto/request/` and `dto/response/` packages. All DTOs are Java records 
 | `BadCredentialsException` | 401 UNAUTHORIZED | :37 |
 | `RefreshTokenException` | 401 UNAUTHORIZED | :44 |
 | `DuplicateNoteLabelException` | 409 CONFLICT | :50 |
-| `ResourceNotFoundException` | 404 NOT_FOUND | :57 |
-| `Exception` (catch-all) | 500 INTERNAL_SERVER_ERROR | :64 |
+| `DuplicateGroceryLabelException` | 409 CONFLICT | :57 |
+| `ResourceNotFoundException` | 404 NOT_FOUND | :64 |
+| `Exception` (catch-all) | 500 INTERNAL_SERVER_ERROR | :71 |
 
 Custom exceptions extend `RuntimeException`:
 - `EmailAlreadyExistsException` (exception/EmailAlreadyExistsException.java:3)
 - `RefreshTokenException` (exception/RefreshTokenException.java:3)
 - `ResourceNotFoundException` (exception/ResourceNotFoundException.java:3)
 - `DuplicateNoteLabelException` (exception/DuplicateNoteLabelException.java:3)
+- `DuplicateGroceryLabelException` (exception/DuplicateGroceryLabelException.java:3)
 
 ## JWT Security Filter Chain
 
@@ -157,3 +159,28 @@ All note/label queries are scoped by user using `findByIdAndUser(UUID id, User u
 - `@PreUpdate` on `onUpdate()` (model/entity/User.java:41-44) — updates only `updatedAt`
 
 Note: `RefreshToken` entity does not use lifecycle callbacks; it has an `expiryDate` field set manually at creation time (service/AuthService.java:106).
+
+## Shared Label Pattern (Grocery)
+
+`GroceryLabel` is a single label entity shared across both `GroceryList` and `GroceryItem` via separate ManyToMany join tables:
+
+- **GroceryList owning side**: `GroceryList.labels` — `@JoinTable(name = "grocery_list_label_mappings")`
+- **GroceryItem owning side**: `GroceryItem.labels` — `@JoinTable(name = "grocery_item_label_mappings")`
+- **GroceryLabel inverse sides**: `mappedBy = "labels"` on both `groceryLists` and `groceryItems` sets
+- On label deletion, `GroceryLabelService.deleteLabel()` cleans up both relationship sides before deleting
+
+This differs from the NoteLabel pattern (one entity ↔ one entity) by having one label entity referenced by two different entity types.
+
+## Auto-Archive Pattern (Grocery)
+
+`GroceryItemService.toggleChecked()` implements auto-archive:
+1. Flip the item's `checked` flag
+2. If the item was just checked (`saved.isChecked() == true`), check if any unchecked items remain via `existsByGroceryListAndCheckedFalse(list)`
+3. If no unchecked items remain, set `list.setArchived(true)` and save
+4. Unchecking an item does NOT auto-unarchive — manual `toggleArchive` PATCH is required
+
+## Cascade Delete Pattern (Grocery)
+
+`GroceryList.items` uses `CascadeType.ALL` + `orphanRemoval = true`:
+- Deleting a `GroceryList` automatically deletes all its `GroceryItem` children
+- No need for manual item cleanup in `GroceryListService.deleteGroceryList()`

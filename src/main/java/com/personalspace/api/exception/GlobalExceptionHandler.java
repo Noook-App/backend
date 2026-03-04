@@ -54,6 +54,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
     }
 
+    @ExceptionHandler(DuplicateGroceryLabelException.class)
+    public ResponseEntity<ApiErrorResponse> handleDuplicateGroceryLabel(DuplicateGroceryLabelException ex) {
+        ApiErrorResponse response = new ApiErrorResponse(
+                HttpStatus.CONFLICT.value(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleResourceNotFound(ResourceNotFoundException ex) {
         ApiErrorResponse response = new ApiErrorResponse(

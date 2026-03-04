@@ -1,6 +1,6 @@
 # PersonaSpace API
 
-Spring Boot 4.0.3 REST API for user authentication, profile management, notes, and labels.
+Spring Boot 4.0.3 REST API for user authentication, profile management, notes, labels, and grocery lists.
 Java 21, Maven, PostgreSQL (prod), H2 (test).
 
 ## Tech Stack
@@ -88,6 +88,36 @@ mvn test -Dtest=ClassName  # Run a single test class
 | PUT | `/api/notes/labels/{id}` | Update note label name |
 | DELETE | `/api/notes/labels/{id}` | Delete note label |
 
+### Grocery Lists (`/api/grocery-lists`) — authenticated
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/grocery-lists` | Create grocery list (supports inline items) |
+| GET | `/api/grocery-lists?archived=false&page=0&size=10` | List grocery lists (paginated) |
+| GET | `/api/grocery-lists/{id}` | Get single grocery list with items |
+| PUT | `/api/grocery-lists/{id}` | Update grocery list title/labels |
+| DELETE | `/api/grocery-lists/{id}` | Hard delete grocery list (cascades items) |
+| PATCH | `/api/grocery-lists/{id}/archive` | Toggle archive |
+
+### Grocery Items (`/api/grocery-lists/{listId}/items`) — authenticated
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/grocery-lists/{listId}/items` | Add item to list |
+| GET | `/api/grocery-lists/{listId}/items` | List items (unchecked first) |
+| PUT | `/api/grocery-lists/{listId}/items/{itemId}` | Update item |
+| DELETE | `/api/grocery-lists/{listId}/items/{itemId}` | Delete item |
+| PATCH | `/api/grocery-lists/{listId}/items/{itemId}/check` | Toggle checked (auto-archives list when all checked) |
+
+### Grocery Labels (`/api/grocery-lists/labels`) — authenticated
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/grocery-lists/labels` | Create grocery label |
+| GET | `/api/grocery-lists/labels` | List user's grocery labels |
+| PUT | `/api/grocery-lists/labels/{id}` | Update grocery label name |
+| DELETE | `/api/grocery-lists/labels/{id}` | Delete grocery label (cleans up from lists and items) |
+
 ## Key Files
 
 | File | Purpose |
@@ -107,6 +137,15 @@ mvn test -Dtest=ClassName  # Run a single test class
 | `model/entity/Note.java` | Note entity with ManyToMany labels, pin/archive |
 | `model/entity/NoteLabel.java` | Note label entity with unique (name, user) constraint |
 | `dto/response/PaginatedResponse.java` | Generic paginated response wrapper |
+| `controller/GroceryListController.java` | Grocery list CRUD, archive endpoints |
+| `controller/GroceryItemController.java` | Grocery item CRUD, check toggle endpoints |
+| `controller/GroceryLabelController.java` | Grocery label CRUD endpoints |
+| `service/GroceryListService.java` | Grocery list business logic, inline item creation |
+| `service/GroceryItemService.java` | Grocery item business logic, auto-archive on last check |
+| `service/GroceryLabelService.java` | Grocery label business logic, shared label pool |
+| `model/entity/GroceryList.java` | Grocery list entity with ManyToMany labels, OneToMany items |
+| `model/entity/GroceryItem.java` | Grocery item entity with ManyToMany labels, checked flag |
+| `model/entity/GroceryLabel.java` | Shared label for both grocery lists and items |
 
 ## Additional Documentation
 
