@@ -128,6 +128,27 @@ public class GroceryListService {
         return toGroceryListResponse(saved);
     }
 
+    public PaginatedResponse<GroceryListResponse> searchGroceryLists(String email, String query, boolean archived, int page, int size) {
+        if (query == null || query.isBlank()) {
+            return getGroceryLists(email, archived, page, size);
+        }
+
+        User user = userService.getUserByEmail(email);
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Order.desc("createdAt")));
+        Page<GroceryList> listPage = groceryListRepository.searchByUserAndQuery(user, query, archived, pageable);
+
+        List<GroceryListResponse> content = listPage.getContent().stream()
+                .map(this::toGroceryListResponse)
+                .toList();
+        return new PaginatedResponse<>(
+                content,
+                listPage.getNumber(),
+                listPage.getSize(),
+                listPage.getTotalElements(),
+                listPage.getTotalPages()
+        );
+    }
+
     private Set<GroceryLabel> resolveLabels(List<UUID> labelIds, User user) {
         if (labelIds == null || labelIds.isEmpty()) {
             return new HashSet<>();

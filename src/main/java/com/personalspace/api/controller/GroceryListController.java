@@ -66,6 +66,17 @@ public class GroceryListController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<PaginatedResponse<GroceryListResponse>> searchGroceryLists(
+            Principal principal,
+            @RequestParam(defaultValue = "") String q,
+            @RequestParam(defaultValue = "false") boolean archived,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        PaginatedResponse<GroceryListResponse> response = groceryListService.searchGroceryLists(principal.getName(), q, archived, page, size);
+        return ResponseEntity.ok(response);
+    }
+
     @PatchMapping("/{id}/archive")
     public ResponseEntity<GroceryListResponse> toggleArchive(
             Principal principal,

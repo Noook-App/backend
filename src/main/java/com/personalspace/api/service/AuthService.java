@@ -60,8 +60,10 @@ public class AuthService {
 
         String accessToken = jwtService.generateAccessToken(user.getEmail());
         String refreshToken = createRefreshToken(user).getToken();
+        long expiresIn = jwtService.getAccessTokenExpiration() / 1000;
+        long expiresAt = System.currentTimeMillis() + jwtService.getAccessTokenExpiration();
 
-        return new AuthResponse(accessToken, refreshToken, jwtService.getAccessTokenExpiration() / 1000, user.getName(), user.getEmail());
+        return new AuthResponse(accessToken, refreshToken, expiresIn, expiresAt, user.getName(), user.getEmail());
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -73,8 +75,10 @@ public class AuthService {
 
         String accessToken = jwtService.generateAccessToken(user.getEmail());
         String refreshToken = createRefreshToken(user).getToken();
+        long expiresIn = jwtService.getAccessTokenExpiration() / 1000;
+        long expiresAt = System.currentTimeMillis() + jwtService.getAccessTokenExpiration();
 
-        return new AuthResponse(accessToken, refreshToken, jwtService.getAccessTokenExpiration() / 1000, user.getName(), user.getEmail());
+        return new AuthResponse(accessToken, refreshToken, expiresIn, expiresAt, user.getName(), user.getEmail());
     }
 
     @Transactional
@@ -94,8 +98,10 @@ public class AuthService {
 
         String accessToken = jwtService.generateAccessToken(user.getEmail());
         String newRefreshToken = createRefreshToken(user).getToken();
+        long expiresIn = jwtService.getAccessTokenExpiration() / 1000;
+        long expiresAt = System.currentTimeMillis() + jwtService.getAccessTokenExpiration();
 
-        return new AuthResponse(accessToken, newRefreshToken, jwtService.getAccessTokenExpiration() / 1000, user.getName(), user.getEmail());
+        return new AuthResponse(accessToken, newRefreshToken, expiresIn, expiresAt, user.getName(), user.getEmail());
     }
 
     @Transactional

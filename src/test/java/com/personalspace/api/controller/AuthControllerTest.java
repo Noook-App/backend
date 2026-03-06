@@ -47,7 +47,7 @@ class AuthControllerTest {
     @Test
     void signup_shouldReturn201_whenRequestIsValid() throws Exception {
         SignupRequest request = new SignupRequest("Test", "test@test.com", "password123");
-        AuthResponse authResponse = new AuthResponse("access-token", "refresh-token", 900000L, "Test", "test@test.com");
+        AuthResponse authResponse = new AuthResponse("access-token", "refresh-token", 900L, 9999999999000L, "Test", "test@test.com");
 
         when(authService.signup(any(SignupRequest.class))).thenReturn(authResponse);
 
@@ -57,7 +57,8 @@ class AuthControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.accessToken").value("access-token"))
                 .andExpect(jsonPath("$.refreshToken").value("refresh-token"))
-                .andExpect(jsonPath("$.tokenType").value("Bearer"));
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.expiresAt").isNumber());
     }
 
     @Test
@@ -86,7 +87,7 @@ class AuthControllerTest {
     @Test
     void login_shouldReturn200_whenCredentialsAreValid() throws Exception {
         LoginRequest request = new LoginRequest("test@test.com", "password123");
-        AuthResponse authResponse = new AuthResponse("access-token", "refresh-token", 900000L, "Test", "test@test.com");
+        AuthResponse authResponse = new AuthResponse("access-token", "refresh-token", 900L, 9999999999000L, "Test", "test@test.com");
 
         when(authService.login(any(LoginRequest.class))).thenReturn(authResponse);
 

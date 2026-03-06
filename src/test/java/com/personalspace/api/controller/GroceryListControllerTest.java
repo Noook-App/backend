@@ -155,6 +155,22 @@ class GroceryListControllerTest {
     }
 
     @Test
+    void searchGroceryLists_shouldReturn200() throws Exception {
+        GroceryListResponse listResponse = createGroceryListResponse();
+        PaginatedResponse<GroceryListResponse> response = new PaginatedResponse<>(
+                List.of(listResponse), 0, 10, 1, 1);
+
+        when(groceryListService.searchGroceryLists(anyString(), eq("Weekly"), eq(false), eq(0), eq(10))).thenReturn(response);
+
+        mockMvc.perform(get("/api/grocery-lists/search")
+                        .principal(mockPrincipal)
+                        .param("q", "Weekly"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].title").value("Weekly Groceries"))
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
     void toggleArchive_shouldReturn200() throws Exception {
         UUID listId = UUID.randomUUID();
         GroceryListResponse response = new GroceryListResponse(
