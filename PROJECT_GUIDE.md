@@ -1,4 +1,4 @@
-# PersonaSpace API - Project Structure Guide
+# Noook API - Project Structure Guide
 
 This guide walks through every folder and file in the project. It assumes no prior Spring Boot knowledge.
 

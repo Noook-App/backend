@@ -1,4 +1,4 @@
-# PersonaSpace API
+# Noook API
 
 Spring Boot 4.0.3 REST API for user authentication, profile management, notes, labels, and grocery lists.
 Java 21, Maven, PostgreSQL (prod), H2 (test).

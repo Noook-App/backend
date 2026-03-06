@@ -1,6 +1,6 @@
 # Architectural Patterns
 
-Detailed patterns observed across the PersonaSpace API codebase.
+Detailed patterns observed across the Noook API codebase.
 
 ## Layered Architecture
 

@@ -1,6 +1,6 @@
-# PersonaSpace API
+# Noook API
 
-REST API for the PersonaSpace application, handling user authentication with JWT-based stateless security.
+REST API for the Noook application, handling user authentication with JWT-based stateless security.
 
 Built with Java 21, Spring Boot 4.0.3, and PostgreSQL.
 
