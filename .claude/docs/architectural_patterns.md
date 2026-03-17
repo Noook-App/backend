@@ -48,8 +48,9 @@ Separate `dto/request/` and `dto/response/` packages. All DTOs are Java records 
 | `RefreshTokenException` | 401 UNAUTHORIZED | :44 |
 | `DuplicateNoteLabelException` | 409 CONFLICT | :50 |
 | `DuplicateGroceryLabelException` | 409 CONFLICT | :57 |
-| `ResourceNotFoundException` | 404 NOT_FOUND | :64 |
-| `Exception` (catch-all) | 500 INTERNAL_SERVER_ERROR | :71 |
+| `DuplicateGroceryItemLabelException` | 409 CONFLICT | :63 |
+| `ResourceNotFoundException` | 404 NOT_FOUND | :70 |
+| `Exception` (catch-all) | 500 INTERNAL_SERVER_ERROR | :77 |
 
 Custom exceptions extend `RuntimeException`:
 - `EmailAlreadyExistsException` (exception/EmailAlreadyExistsException.java:3)
@@ -57,6 +58,7 @@ Custom exceptions extend `RuntimeException`:
 - `ResourceNotFoundException` (exception/ResourceNotFoundException.java:3)
 - `DuplicateNoteLabelException` (exception/DuplicateNoteLabelException.java:3)
 - `DuplicateGroceryLabelException` (exception/DuplicateGroceryLabelException.java:3)
+- `DuplicateGroceryItemLabelException` (exception/DuplicateGroceryItemLabelException.java:3)
 
 ## JWT Security Filter Chain
 
@@ -160,16 +162,21 @@ All note/label queries are scoped by user using `findByIdAndUser(UUID id, User u
 
 Note: `RefreshToken` entity does not use lifecycle callbacks; it has an `expiryDate` field set manually at creation time (service/AuthService.java:106).
 
-## Shared Label Pattern (Grocery)
+## Separate Label Pools (Grocery)
 
-`GroceryLabel` is a single label entity shared across both `GroceryList` and `GroceryItem` via separate ManyToMany join tables:
+Grocery lists and grocery items each have their own dedicated label entity:
 
-- **GroceryList owning side**: `GroceryList.labels` — `@JoinTable(name = "grocery_list_label_mappings")`
-- **GroceryItem owning side**: `GroceryItem.labels` — `@JoinTable(name = "grocery_item_label_mappings")`
-- **GroceryLabel inverse sides**: `mappedBy = "labels"` on both `groceryLists` and `groceryItems` sets
-- On label deletion, `GroceryLabelService.deleteLabel()` cleans up both relationship sides before deleting
+- **GroceryLabel** — labels for `GroceryList` entities
+  - **Owning side**: `GroceryList.labels` — `@JoinTable(name = "grocery_list_label_mappings")`
+  - **Inverse side**: `GroceryLabel.groceryLists` — `mappedBy = "labels"`
+  - On deletion, `GroceryLabelService.deleteLabel()` removes from all lists
 
-This differs from the NoteLabel pattern (one entity ↔ one entity) by having one label entity referenced by two different entity types.
+- **GroceryItemLabel** — labels for `GroceryItem` entities
+  - **Owning side**: `GroceryItem.labels` — `@JoinTable(name = "grocery_item_label_mappings")`
+  - **Inverse side**: `GroceryItemLabel.groceryItems` — `mappedBy = "labels"`
+  - On deletion, `GroceryItemLabelService.deleteLabel()` removes from all items
+
+Both follow the same pattern as `NoteLabel` — user-scoped unique names with bidirectional ManyToMany for cleanup.
 
 ## Auto-Archive Pattern (Grocery)
 

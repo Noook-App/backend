@@ -88,6 +88,12 @@ mvn test -Dtest=ClassName  # Run a single test class
 | PUT | `/api/notes/labels/{id}` | Update note label name |
 | DELETE | `/api/notes/labels/{id}` | Delete note label |
 
+### User Profile (`/api/user`) — authenticated
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/user/me` | Get current user's profile |
+
 ### Grocery Lists (`/api/grocery-lists`) — authenticated
 
 | Method | Path | Description |
@@ -97,6 +103,7 @@ mvn test -Dtest=ClassName  # Run a single test class
 | GET | `/api/grocery-lists/{id}` | Get single grocery list with items |
 | PUT | `/api/grocery-lists/{id}` | Update grocery list title/labels |
 | DELETE | `/api/grocery-lists/{id}` | Hard delete grocery list (cascades items) |
+| GET | `/api/grocery-lists/search?q=...&archived=false&page=0&size=10` | Search grocery lists by title/item names |
 | PATCH | `/api/grocery-lists/{id}/archive` | Toggle archive |
 
 ### Grocery Items (`/api/grocery-lists/{listId}/items`) — authenticated
@@ -116,14 +123,25 @@ mvn test -Dtest=ClassName  # Run a single test class
 | POST | `/api/grocery-lists/labels` | Create grocery label |
 | GET | `/api/grocery-lists/labels` | List user's grocery labels |
 | PUT | `/api/grocery-lists/labels/{id}` | Update grocery label name |
-| DELETE | `/api/grocery-lists/labels/{id}` | Delete grocery label (cleans up from lists and items) |
+| DELETE | `/api/grocery-lists/labels/{id}` | Delete grocery label (cleans up from lists) |
+
+### Grocery Item Labels (`/api/grocery-lists/items/labels`) — authenticated
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/grocery-lists/items/labels` | Create grocery item label |
+| GET | `/api/grocery-lists/items/labels` | List user's grocery item labels |
+| PUT | `/api/grocery-lists/items/labels/{id}` | Update grocery item label name |
+| DELETE | `/api/grocery-lists/items/labels/{id}` | Delete grocery item label (cleans up from items) |
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
 | `controller/AuthController.java` | Auth endpoints, delegates to AuthService |
+| `controller/UserController.java` | User profile endpoint (`GET /api/user/me`) |
 | `service/AuthService.java` | Signup, login, refresh, logout logic |
+| `service/UserService.java` | User lookups by ID/email, profile retrieval |
 | `service/JwtService.java` | Token generation, validation, claim extraction |
 | `security/SecurityConfig.java` | Filter chain, CORS, session policy |
 | `security/JwtAuthenticationFilter.java` | Extracts and validates Bearer tokens per request |
@@ -137,15 +155,18 @@ mvn test -Dtest=ClassName  # Run a single test class
 | `model/entity/Note.java` | Note entity with ManyToMany labels, pin/archive |
 | `model/entity/NoteLabel.java` | Note label entity with unique (name, user) constraint |
 | `dto/response/PaginatedResponse.java` | Generic paginated response wrapper |
-| `controller/GroceryListController.java` | Grocery list CRUD, archive endpoints |
+| `controller/GroceryListController.java` | Grocery list CRUD, search, archive endpoints |
 | `controller/GroceryItemController.java` | Grocery item CRUD, check toggle endpoints |
 | `controller/GroceryLabelController.java` | Grocery label CRUD endpoints |
-| `service/GroceryListService.java` | Grocery list business logic, inline item creation |
+| `controller/GroceryItemLabelController.java` | Grocery item label CRUD endpoints |
+| `service/GroceryListService.java` | Grocery list business logic, inline item creation, search |
 | `service/GroceryItemService.java` | Grocery item business logic, auto-archive on last check |
-| `service/GroceryLabelService.java` | Grocery label business logic, shared label pool |
+| `service/GroceryLabelService.java` | Grocery label business logic for lists |
+| `service/GroceryItemLabelService.java` | Grocery item label business logic |
 | `model/entity/GroceryList.java` | Grocery list entity with ManyToMany labels, OneToMany items |
-| `model/entity/GroceryItem.java` | Grocery item entity with ManyToMany labels, checked flag |
-| `model/entity/GroceryLabel.java` | Shared label for both grocery lists and items |
+| `model/entity/GroceryItem.java` | Grocery item entity with ManyToMany item labels, checked flag |
+| `model/entity/GroceryLabel.java` | Label entity for grocery lists |
+| `model/entity/GroceryItemLabel.java` | Label entity for grocery items |
 
 ## Additional Documentation
 

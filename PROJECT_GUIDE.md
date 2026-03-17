@@ -6,7 +6,7 @@ This guide walks through every folder and file in the project. It assumes no pri
 
 ## What This Project Is
 
-A REST API that handles user authentication, notes management with search/pin/archive, and labels. It's built with:
+A REST API that handles user authentication, notes management with search/pin/archive, grocery lists with items, and labels. It's built with:
 
 - **Java 21** — the programming language
 - **Spring Boot 4.0.3** — a framework that handles all the plumbing (HTTP server, database connections, dependency injection, security) so you can focus on business logic
@@ -113,15 +113,66 @@ Defines eight endpoints under `/api/notes` for note CRUD, search, pin, and archi
 | `@PatchMapping("/{id}/pin")` | `togglePin()` | Toggles pinned status |
 | `@PatchMapping("/{id}/archive")` | `toggleArchive()` | Toggles archived status |
 
-#### `LabelController.java`
-Defines four endpoints under `/api/labels` for label CRUD. Uses the same `Principal` auth pattern.
+#### `NoteLabelController.java`
+Defines four endpoints under `/api/notes/labels` for note label CRUD. Uses the same `Principal` auth pattern.
 
 | Annotation | Method | What It Does |
 |---|---|---|
-| `@PostMapping` | `createLabel()` | Creates a label, returns 201 |
-| `@GetMapping` | `getLabels()` | Lists all user's labels alphabetically |
+| `@PostMapping` | `createLabel()` | Creates a note label, returns 201 |
+| `@GetMapping` | `getLabels()` | Lists all user's note labels alphabetically |
 | `@PutMapping("/{id}")` | `updateLabel()` | Updates label name |
 | `@DeleteMapping("/{id}")` | `deleteLabel()` | Deletes label + removes from notes, returns 204 |
+
+#### `UserController.java`
+Defines one endpoint under `/api/user` for the authenticated user's profile.
+
+| Annotation | Method | What It Does |
+|---|---|---|
+| `@GetMapping("/me")` | `getProfile()` | Returns user's name and email |
+
+#### `GroceryListController.java`
+Defines seven endpoints under `/api/grocery-lists` for grocery list CRUD, search, and archive. Uses `Principal` auth.
+
+| Annotation | Method | What It Does |
+|---|---|---|
+| `@PostMapping` | `createGroceryList()` | Creates list with optional inline items, returns 201 |
+| `@GetMapping` | `getGroceryLists()` | Lists paginated grocery lists |
+| `@GetMapping("/{id}")` | `getGroceryList()` | Gets a single grocery list with items |
+| `@PutMapping("/{id}")` | `updateGroceryList()` | Updates list title and labels |
+| `@DeleteMapping("/{id}")` | `deleteGroceryList()` | Hard deletes list (cascades items), returns 204 |
+| `@GetMapping("/search")` | `searchGroceryLists()` | Searches by title/item names |
+| `@PatchMapping("/{id}/archive")` | `toggleArchive()` | Toggles archived status |
+
+#### `GroceryItemController.java`
+Defines five endpoints under `/api/grocery-lists/{listId}/items` for item CRUD and check toggle.
+
+| Annotation | Method | What It Does |
+|---|---|---|
+| `@PostMapping` | `createItem()` | Adds an item to a list, returns 201 |
+| `@GetMapping` | `getItems()` | Lists items (unchecked first) |
+| `@PutMapping("/{itemId}")` | `updateItem()` | Updates item name/quantity/labels |
+| `@DeleteMapping("/{itemId}")` | `deleteItem()` | Deletes an item, returns 204 |
+| `@PatchMapping("/{itemId}/check")` | `toggleChecked()` | Toggles checked (auto-archives list when all checked) |
+
+#### `GroceryLabelController.java`
+Defines four endpoints under `/api/grocery-lists/labels` for grocery list label CRUD.
+
+| Annotation | Method | What It Does |
+|---|---|---|
+| `@PostMapping` | `createLabel()` | Creates a grocery label, returns 201 |
+| `@GetMapping` | `getLabels()` | Lists user's grocery labels alphabetically |
+| `@PutMapping("/{id}")` | `updateLabel()` | Updates label name |
+| `@DeleteMapping("/{id}")` | `deleteLabel()` | Deletes label + removes from lists, returns 204 |
+
+#### `GroceryItemLabelController.java`
+Defines four endpoints under `/api/grocery-lists/items/labels` for grocery item label CRUD.
+
+| Annotation | Method | What It Does |
+|---|---|---|
+| `@PostMapping` | `createLabel()` | Creates an item label, returns 201 |
+| `@GetMapping` | `getLabels()` | Lists user's item labels alphabetically |
+| `@PutMapping("/{id}")` | `updateLabel()` | Updates label name |
+| `@DeleteMapping("/{id}")` | `deleteLabel()` | Deletes label + removes from items, returns 204 |
 
 ---
 
@@ -166,12 +217,40 @@ Handles all note operations:
 - **`searchNotes()`** — case-insensitive LIKE search on title and content; blank query falls back to `getNotes()`
 - Private helpers: `resolveLabels()`, `toNoteResponse()`, `toPaginatedResponse()`
 
-#### `LabelService.java`
-Handles label CRUD:
+#### `NoteLabelService.java`
+Handles note label CRUD:
 - **`createLabel()`** — checks for duplicate name per user, saves
-- **`getLabels()`** — returns all labels alphabetically
+- **`getLabels()`** — returns all note labels alphabetically
 - **`updateLabel()`** — checks ownership + duplicate name
 - **`deleteLabel()`** — removes label from all associated notes (bidirectional ManyToMany cleanup), then deletes
+
+#### `GroceryListService.java`
+Handles grocery list operations:
+- **`createGroceryList()`** — creates list with optional inline items and labels
+- **`getGroceryLists()`** — paginated list filtered by archived flag
+- **`getGroceryList()`** — ownership-scoped single list fetch with items
+- **`updateGroceryList()`** — updates title and labels
+- **`deleteGroceryList()`** — cascades delete to items
+- **`toggleArchive()`** — flips archived status
+- **`searchGroceryLists()`** — searches title and item names (case-insensitive)
+
+#### `GroceryItemService.java`
+Handles grocery item operations:
+- **`createItem()`** — adds item to a list
+- **`getItems()`** — returns items sorted unchecked first
+- **`updateItem()`** — updates name, quantity, labels
+- **`deleteItem()`** — ownership-scoped delete
+- **`toggleChecked()`** — flips checked status; auto-archives list when all items are checked
+
+#### `GroceryLabelService.java`
+Handles grocery list label CRUD (same pattern as NoteLabelService):
+- **`createLabel()`** / **`getLabels()`** / **`updateLabel()`** / **`deleteLabel()`**
+- On delete, removes label from all associated grocery lists
+
+#### `GroceryItemLabelService.java`
+Handles grocery item label CRUD:
+- **`createLabel()`** / **`getLabels()`** / **`updateLabel()`** / **`deleteLabel()`**
+- On delete, removes label from all associated grocery items
 
 ---
 
@@ -213,16 +292,39 @@ public interface NoteRepository extends JpaRepository<Note, UUID> {
 - `findByUserAndArchived` — paginated list with archived filter
 - `searchByUserAndQuery` — custom `@Query` using `LOWER()` + `LIKE` for cross-DB compatibility (works on both PostgreSQL and H2)
 
-#### `LabelRepository.java`
+#### `NoteLabelRepository.java`
 ```java
-public interface LabelRepository extends JpaRepository<Label, UUID> {
-    List<Label> findAllByUserOrderByNameAsc(User user);
+public interface NoteLabelRepository extends JpaRepository<NoteLabel, UUID> {
+    List<NoteLabel> findAllByUserOrderByNameAsc(User user);
     boolean existsByNameAndUser(String name, User user);
-    Optional<Label> findByIdAndUser(UUID id, User user);
+    Optional<NoteLabel> findByIdAndUser(UUID id, User user);
 }
 ```
-- `findAllByUserOrderByNameAsc` — lists labels alphabetically for a user
+- `findAllByUserOrderByNameAsc` — lists note labels alphabetically for a user
 - `existsByNameAndUser` — duplicate check before create/update
+
+#### `GroceryListRepository.java`
+```java
+public interface GroceryListRepository extends JpaRepository<GroceryList, UUID> {
+    Optional<GroceryList> findByIdAndUser(UUID id, User user);
+    Page<GroceryList> findByUserAndArchived(User user, boolean archived, Pageable pageable);
+    @Query("...") Page<GroceryList> searchByUserAndQuery(User user, String query, boolean archived, Pageable pageable);
+}
+```
+- Searches title and item names via custom `@Query` with `LOWER()` + `LIKE`
+
+#### `GroceryItemRepository.java`
+```java
+public interface GroceryItemRepository extends JpaRepository<GroceryItem, UUID> {
+    Optional<GroceryItem> findByIdAndGroceryList(UUID id, GroceryList groceryList);
+    List<GroceryItem> findByGroceryListOrderByCheckedAscCreatedAtAsc(GroceryList groceryList);
+    boolean existsByGroceryListAndCheckedFalse(GroceryList groceryList);
+}
+```
+- `existsByGroceryListAndCheckedFalse` — used by auto-archive logic
+
+#### `GroceryLabelRepository.java` / `GroceryItemLabelRepository.java`
+Same pattern as `NoteLabelRepository` — `findAllByUserOrderByNameAsc`, `existsByNameAndUser`, `findByIdAndUser`.
 
 ---
 
@@ -263,14 +365,14 @@ Maps to the `notes` table. Fields:
 | `pinned` | boolean | Default false |
 | `archived` | boolean | Default false (soft delete) |
 | `user` | User | Many-to-one (LAZY), foreign key |
-| `labels` | Set\<Label> | Many-to-many via `note_labels` join table |
+| `labels` | Set\<NoteLabel> | Many-to-many via `note_label_mappings` join table |
 | `createdAt` | Instant | Set on creation |
 | `updatedAt` | Instant | Set on creation and every update |
 
-Uses `@PrePersist` and `@PreUpdate` lifecycle callbacks (same pattern as `User`). The `labels` field uses `Set<Label>` to avoid Hibernate bag issues.
+Uses `@PrePersist` and `@PreUpdate` lifecycle callbacks (same pattern as `User`). The `labels` field uses `Set<NoteLabel>` to avoid Hibernate bag issues.
 
-#### `Label.java`
-Maps to the `labels` table. Fields:
+#### `NoteLabel.java`
+Maps to the `note_labels` table. Fields:
 
 | Field | Type | Notes |
 |---|---|---|
@@ -280,7 +382,41 @@ Maps to the `labels` table. Fields:
 | `createdAt` | Instant | Set on creation |
 | `notes` | Set\<Note> | Bidirectional ManyToMany (mappedBy="labels") |
 
-Has a unique constraint on `(name, user_id)` — each user's labels must have unique names. The bidirectional `notes` relationship is needed for cleanup when deleting a label.
+Has a unique constraint on `(name, user_id)` — each user's note labels must have unique names. The bidirectional `notes` relationship is needed for cleanup when deleting a label.
+
+#### `GroceryList.java`
+Maps to the `grocery_lists` table. Fields:
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key, auto-generated |
+| `title` | String | Not null |
+| `archived` | boolean | Default false |
+| `user` | User | Many-to-one (LAZY), foreign key |
+| `labels` | Set\<GroceryLabel> | ManyToMany via `grocery_list_label_mappings` |
+| `items` | List\<GroceryItem> | OneToMany (cascade ALL, orphanRemoval) |
+| `createdAt` | Instant | Set on creation |
+| `updatedAt` | Instant | Set on creation and every update |
+
+#### `GroceryItem.java`
+Maps to the `grocery_items` table. Fields:
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key, auto-generated |
+| `name` | String | Not null |
+| `quantity` | String | Nullable |
+| `checked` | boolean | Default false |
+| `groceryList` | GroceryList | Many-to-one (LAZY), foreign key |
+| `labels` | Set\<GroceryItemLabel> | ManyToMany via `grocery_item_label_mappings` |
+| `createdAt` | Instant | Set on creation |
+| `updatedAt` | Instant | Set on creation and every update |
+
+#### `GroceryLabel.java`
+Maps to the `grocery_labels` table. Same pattern as `NoteLabel` — unique `(name, user_id)` constraint, bidirectional ManyToMany with `GroceryList`.
+
+#### `GroceryItemLabel.java`
+Maps to the `grocery_item_labels` table. Same pattern as `NoteLabel` — unique `(name, user_id)` constraint, bidirectional ManyToMany with `GroceryItem`.
 
 #### `RefreshToken.java`
 Maps to the `refresh_tokens` table. Fields:
@@ -330,10 +466,28 @@ Fields: `title` (`@NotBlank`, `@Size(max=255)`), `content`, `pinned` (Boolean), 
 #### `UpdateNoteRequest.java`
 Fields: `title` (`@NotBlank`, `@Size(max=255)`), `content`, `pinned`, `archived`, `labelIds`
 
-#### `CreateLabelRequest.java`
+#### `CreateNoteLabelRequest.java`
 Field: `name` (`@NotBlank`, `@Size(max=50)`)
 
-#### `UpdateLabelRequest.java`
+#### `UpdateNoteLabelRequest.java`
+Field: `name` (`@NotBlank`, `@Size(max=50)`)
+
+#### `CreateGroceryListRequest.java`
+Fields: `title` (`@Size(max=255)`), `items` (List of inline items), `labelIds` (List\<UUID>)
+
+#### `UpdateGroceryListRequest.java`
+Fields: `title`, `labelIds` — all optional
+
+#### `CreateGroceryItemRequest.java`
+Fields: `name` (`@NotBlank`, `@Size(max=255)`), `quantity`, `labelIds` (List\<UUID>)
+
+#### `UpdateGroceryItemRequest.java`
+Fields: `name` (`@NotBlank`, `@Size(max=255)`), `quantity`, `labelIds`
+
+#### `CreateGroceryLabelRequest.java` / `UpdateGroceryLabelRequest.java`
+Field: `name` (`@NotBlank`, `@Size(max=50)`)
+
+#### `CreateGroceryItemLabelRequest.java` / `UpdateGroceryItemLabelRequest.java`
 Field: `name` (`@NotBlank`, `@Size(max=50)`)
 
 ---
@@ -365,10 +519,22 @@ Returned by `GlobalExceptionHandler` on any error. Shape:
 Has convenience constructors that auto-set `timestamp` to now and allow `errors` to be null (for non-validation errors).
 
 #### `NoteResponse.java`
-Returned by all note endpoints. Shape: `id`, `title`, `content`, `pinned`, `archived`, `labels` (list of `LabelResponse`), `createdAt`, `updatedAt`.
+Returned by all note endpoints. Shape: `id`, `title`, `content`, `pinned`, `archived`, `labels` (list of `NoteLabelResponse`), `createdAt`, `updatedAt`.
 
-#### `LabelResponse.java`
-Returned by label endpoints. Shape: `id`, `name`, `createdAt`.
+#### `NoteLabelResponse.java`
+Returned by note label endpoints. Shape: `id`, `name`, `createdAt`.
+
+#### `GroceryListResponse.java`
+Returned by grocery list endpoints. Shape: `id`, `title`, `archived`, `labels` (list of `GroceryLabelResponse`), `items` (list of `GroceryItemResponse`), `createdAt`, `updatedAt`.
+
+#### `GroceryItemResponse.java`
+Returned by grocery item endpoints. Shape: `id`, `name`, `quantity`, `checked`, `labels` (list of `GroceryItemLabelResponse`), `createdAt`, `updatedAt`.
+
+#### `GroceryLabelResponse.java`
+Returned by grocery label endpoints. Shape: `id`, `name`, `createdAt`.
+
+#### `GroceryItemLabelResponse.java`
+Returned by grocery item label endpoints. Shape: `id`, `name`, `createdAt`.
 
 #### `PaginatedResponse.java`
 Generic wrapper for paginated results: `content` (list), `page`, `size`, `totalElements`, `totalPages`. Decouples the API contract from Spring's `Page` internals.
@@ -429,6 +595,9 @@ Annotated with `@RestControllerAdvice` — this tells Spring: "whenever *any* co
 | `EmailAlreadyExistsException` | 409 Conflict | Signup with an already-registered email |
 | `BadCredentialsException` | 401 Unauthorized | Login with wrong password |
 | `RefreshTokenException` | 401 Unauthorized | Invalid or expired refresh token |
+| `DuplicateNoteLabelException` | 409 Conflict | Duplicate note label name per user |
+| `DuplicateGroceryLabelException` | 409 Conflict | Duplicate grocery label name per user |
+| `DuplicateGroceryItemLabelException` | 409 Conflict | Duplicate grocery item label name per user |
 | `ResourceNotFoundException` | 404 Not Found | Entity not found in database |
 | `Exception` (catch-all) | 500 Internal Server Error | Anything unexpected |
 
@@ -437,10 +606,12 @@ All handlers return an `ApiErrorResponse` for a consistent JSON error format.
 #### Custom Exception Classes
 - `EmailAlreadyExistsException` — thrown by `AuthService.signup()`
 - `RefreshTokenException` — thrown by `AuthService.refresh()`
-- `ResourceNotFoundException` — thrown by `UserService`, `NoteService`, `LabelService`
-- `DuplicateLabelException` — thrown by `LabelService` when label name conflicts (mapped to 409)
+- `ResourceNotFoundException` — thrown by `UserService`, `NoteService`, `NoteLabelService`, `GroceryListService`, `GroceryItemService`, `GroceryLabelService`, `GroceryItemLabelService`
+- `DuplicateNoteLabelException` — thrown by `NoteLabelService` when note label name conflicts (mapped to 409)
+- `DuplicateGroceryLabelException` — thrown by `GroceryLabelService` when grocery label name conflicts (mapped to 409)
+- `DuplicateGroceryItemLabelException` — thrown by `GroceryItemLabelService` when item label name conflicts (mapped to 409)
 
-All four extend `RuntimeException`, so they don't need to be declared in method signatures.
+All extend `RuntimeException`, so they don't need to be declared in method signatures.
 
 ---
 
@@ -511,44 +682,72 @@ api/
      |   |   |- ApiApplication.java           Entry point
      |   |   |- controller/
      |   |   |   |- AuthController.java       Auth HTTP endpoints
-     |   |   |   |- NoteController.java       Note CRUD/search/pin/archive
-     |   |   |   |- LabelController.java      Label CRUD
      |   |   |   |- UserController.java       User profile
+     |   |   |   |- NoteController.java       Note CRUD/search/pin/archive
+     |   |   |   |- NoteLabelController.java  Note label CRUD
+     |   |   |   |- GroceryListController.java    Grocery list CRUD/search/archive
+     |   |   |   |- GroceryItemController.java    Grocery item CRUD/check toggle
+     |   |   |   |- GroceryLabelController.java   Grocery list label CRUD
+     |   |   |   |- GroceryItemLabelController.java  Grocery item label CRUD
      |   |   |- service/
      |   |   |   |- AuthService.java          Auth business logic
      |   |   |   |- JwtService.java           Token generation/validation
      |   |   |   |- UserService.java          User lookups
      |   |   |   |- NoteService.java          Note business logic
-     |   |   |   |- LabelService.java         Label business logic
+     |   |   |   |- NoteLabelService.java     Note label business logic
+     |   |   |   |- GroceryListService.java   Grocery list business logic
+     |   |   |   |- GroceryItemService.java   Grocery item business logic
+     |   |   |   |- GroceryLabelService.java  Grocery label business logic
+     |   |   |   |- GroceryItemLabelService.java  Grocery item label business logic
      |   |   |- repository/
      |   |   |   |- UserRepository.java       User DB queries
      |   |   |   |- RefreshTokenRepository.java  Token DB queries
      |   |   |   |- NoteRepository.java       Note DB queries + search
-     |   |   |   |- LabelRepository.java      Label DB queries
+     |   |   |   |- NoteLabelRepository.java  Note label DB queries
+     |   |   |   |- GroceryListRepository.java    Grocery list DB queries + search
+     |   |   |   |- GroceryItemRepository.java    Grocery item DB queries
+     |   |   |   |- GroceryLabelRepository.java   Grocery label DB queries
+     |   |   |   |- GroceryItemLabelRepository.java  Grocery item label DB queries
      |   |   |- model/
      |   |   |   |- entity/
      |   |   |   |   |- User.java             Users table
      |   |   |   |   |- RefreshToken.java     Refresh tokens table
      |   |   |   |   |- Note.java             Notes table (ManyToMany labels)
-     |   |   |   |   |- Label.java            Labels table (unique per user)
+     |   |   |   |   |- NoteLabel.java        Note labels table (unique per user)
+     |   |   |   |   |- GroceryList.java      Grocery lists table (OneToMany items)
+     |   |   |   |   |- GroceryItem.java      Grocery items table (checked flag)
+     |   |   |   |   |- GroceryLabel.java     Grocery list labels table
+     |   |   |   |   |- GroceryItemLabel.java Grocery item labels table
      |   |   |   |- enums/
      |   |   |       |- Role.java             USER (expandable)
      |   |   |- dto/
      |   |   |   |- request/
-     |   |   |   |   |- SignupRequest.java     Signup input shape
-     |   |   |   |   |- LoginRequest.java      Login input shape
+     |   |   |   |   |- SignupRequest.java     Signup input
+     |   |   |   |   |- LoginRequest.java      Login input
      |   |   |   |   |- RefreshTokenRequest.java  Refresh/logout input
      |   |   |   |   |- CreateNoteRequest.java    Note creation input
      |   |   |   |   |- UpdateNoteRequest.java    Note update input
-     |   |   |   |   |- CreateLabelRequest.java   Label creation input
-     |   |   |   |   |- UpdateLabelRequest.java   Label update input
+     |   |   |   |   |- CreateNoteLabelRequest.java   Note label creation input
+     |   |   |   |   |- UpdateNoteLabelRequest.java   Note label update input
+     |   |   |   |   |- CreateGroceryListRequest.java     Grocery list creation input
+     |   |   |   |   |- UpdateGroceryListRequest.java     Grocery list update input
+     |   |   |   |   |- CreateGroceryItemRequest.java     Grocery item creation input
+     |   |   |   |   |- UpdateGroceryItemRequest.java     Grocery item update input
+     |   |   |   |   |- CreateGroceryLabelRequest.java    Grocery label creation input
+     |   |   |   |   |- UpdateGroceryLabelRequest.java    Grocery label update input
+     |   |   |   |   |- CreateGroceryItemLabelRequest.java   Item label creation input
+     |   |   |   |   |- UpdateGroceryItemLabelRequest.java   Item label update input
      |   |   |   |- response/
      |   |   |       |- AuthResponse.java      Token response shape
      |   |   |       |- ApiErrorResponse.java  Error response shape
-     |   |   |       |- NoteResponse.java      Note response shape
-     |   |   |       |- LabelResponse.java     Label response shape
-     |   |   |       |- PaginatedResponse.java Generic paginated wrapper
      |   |   |       |- UserResponse.java      User profile response
+     |   |   |       |- NoteResponse.java      Note response shape
+     |   |   |       |- NoteLabelResponse.java Note label response shape
+     |   |   |       |- GroceryListResponse.java   Grocery list response shape
+     |   |   |       |- GroceryItemResponse.java   Grocery item response shape
+     |   |   |       |- GroceryLabelResponse.java  Grocery label response shape
+     |   |   |       |- GroceryItemLabelResponse.java  Item label response shape
+     |   |   |       |- PaginatedResponse.java Generic paginated wrapper
      |   |   |- security/
      |   |   |   |- SecurityConfig.java        Security rules + beans
      |   |   |   |- JwtAuthenticationFilter.java  Per-request token check
@@ -558,7 +757,9 @@ api/
      |   |       |- EmailAlreadyExistsException.java
      |   |       |- RefreshTokenException.java
      |   |       |- ResourceNotFoundException.java
-     |   |       |- DuplicateLabelException.java
+     |   |       |- DuplicateNoteLabelException.java
+     |   |       |- DuplicateGroceryLabelException.java
+     |   |       |- DuplicateGroceryItemLabelException.java
      |   |- resources/
      |       |- application.properties        App configuration
      |- test/
@@ -567,16 +768,13 @@ api/
          |   |- controller/
          |   |   |- AuthControllerTest.java   Auth HTTP layer tests
          |   |   |- NoteControllerTest.java   Note HTTP layer tests
-         |   |   |- LabelControllerTest.java  Label HTTP layer tests
          |   |- service/
          |   |   |- AuthServiceTest.java      Auth business logic tests
          |   |   |- JwtServiceTest.java       Token tests
          |   |   |- NoteServiceTest.java      Note business logic tests
-         |   |   |- LabelServiceTest.java     Label business logic tests
          |   |- repository/
          |       |- UserRepositoryTest.java   User DB query tests
          |       |- NoteRepositoryTest.java   Note DB query tests
-         |       |- LabelRepositoryTest.java  Label DB query tests
          |- resources/
              |- application-test.properties   H2 test database config
 ```

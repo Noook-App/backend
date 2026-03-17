@@ -10,10 +10,16 @@ Built with Java 21, Spring Boot 4.0.3, and PostgreSQL.
 - Login with JWT access + refresh token issuance
 - Token refresh with automatic rotation
 - Logout via refresh token invalidation
+- User profile endpoint
 - Notes CRUD with pagination (pinned first, then by recency)
 - Full-text search on note title and content (case-insensitive)
 - Pin and archive (soft delete) toggle for notes
-- Labels with many-to-many relationship to notes
+- Note labels with many-to-many relationship to notes
+- Grocery list CRUD with pagination and search
+- Grocery list archive toggle (auto-archives when all items checked)
+- Grocery items with check/uncheck toggle
+- Inline item creation when creating grocery lists
+- Grocery list labels and grocery item labels (separate label pools)
 - Input validation with descriptive error messages
 - BCrypt password hashing
 
@@ -71,7 +77,7 @@ You should get back a JSON response with `accessToken`, `refreshToken`, `tokenTy
 
 ## API Endpoints
 
-All endpoints are under `/api/auth` and accept/return JSON.
+Auth endpoints are under `/api/auth` and accept/return JSON. All other endpoints require a Bearer token.
 
 ### POST `/api/auth/signup`
 
@@ -194,9 +200,9 @@ Toggle the pinned status of a note.
 
 Toggle the archived status of a note.
 
-## Labels API (authenticated — requires Bearer token)
+## Note Labels API (authenticated — requires Bearer token)
 
-### POST `/api/labels`
+### POST `/api/notes/labels`
 
 **Request body:**
 ```json
@@ -208,17 +214,120 @@ Toggle the archived status of a note.
 { "id": "label-uuid", "name": "Work", "createdAt": "..." }
 ```
 
-### GET `/api/labels`
+### GET `/api/notes/labels`
 
-Returns all labels for the authenticated user, sorted alphabetically.
+Returns all note labels for the authenticated user, sorted alphabetically.
 
-### PUT `/api/labels/{id}`
+### PUT `/api/notes/labels/{id}`
 
 Update label name. Returns 409 if duplicate name.
 
-### DELETE `/api/labels/{id}`
+### DELETE `/api/notes/labels/{id}`
 
 Delete a label (removes it from all associated notes). Returns 204.
+
+## User Profile API (authenticated — requires Bearer token)
+
+### GET `/api/user/me`
+
+Returns the current user's profile (`name`, `email`).
+
+## Grocery Lists API (authenticated — requires Bearer token)
+
+### POST `/api/grocery-lists`
+
+Create a grocery list with optional inline items and labels.
+
+**Request body:**
+```json
+{
+  "title": "Weekly Shopping",
+  "items": [{ "name": "Milk", "quantity": "1L" }],
+  "labelIds": ["label-uuid"]
+}
+```
+
+### GET `/api/grocery-lists?archived=false&page=0&size=10`
+
+List grocery lists with pagination.
+
+### GET `/api/grocery-lists/{id}`
+
+Get a single grocery list with all items.
+
+### PUT `/api/grocery-lists/{id}`
+
+Update grocery list title and labels.
+
+### DELETE `/api/grocery-lists/{id}`
+
+Hard delete a grocery list (cascades to items). Returns 204.
+
+### GET `/api/grocery-lists/search?q=keyword&archived=false&page=0&size=10`
+
+Search grocery lists by title or item names (case-insensitive).
+
+### PATCH `/api/grocery-lists/{id}/archive`
+
+Toggle archived status.
+
+## Grocery Items API (authenticated — requires Bearer token)
+
+### POST `/api/grocery-lists/{listId}/items`
+
+Add an item to a grocery list.
+
+### GET `/api/grocery-lists/{listId}/items`
+
+List items (unchecked first, then by creation date).
+
+### PUT `/api/grocery-lists/{listId}/items/{itemId}`
+
+Update item name, quantity, and labels.
+
+### DELETE `/api/grocery-lists/{listId}/items/{itemId}`
+
+Delete an item. Returns 204.
+
+### PATCH `/api/grocery-lists/{listId}/items/{itemId}/check`
+
+Toggle checked status. Auto-archives the list when all items are checked.
+
+## Grocery Labels API (authenticated — requires Bearer token)
+
+### POST `/api/grocery-lists/labels`
+
+Create a grocery list label. Returns 409 on duplicate name.
+
+### GET `/api/grocery-lists/labels`
+
+List user's grocery labels alphabetically.
+
+### PUT `/api/grocery-lists/labels/{id}`
+
+Update label name.
+
+### DELETE `/api/grocery-lists/labels/{id}`
+
+Delete label (removes from all grocery lists). Returns 204.
+
+## Grocery Item Labels API (authenticated — requires Bearer token)
+
+### POST `/api/grocery-lists/items/labels`
+
+Create a grocery item label. Returns 409 on duplicate name.
+
+### GET `/api/grocery-lists/items/labels`
+
+List user's grocery item labels alphabetically.
+
+### PUT `/api/grocery-lists/items/labels/{id}`
+
+Update label name.
+
+### DELETE `/api/grocery-lists/items/labels/{id}`
+
+Delete label (removes from all grocery items). Returns 204.
 
 ### Error responses
 
@@ -241,7 +350,7 @@ All errors return a consistent format:
 | 400 | Validation failure (missing/invalid fields) |
 | 401 | Wrong password or invalid/expired refresh token |
 | 404 | Resource not found |
-| 409 | Email already registered / Duplicate label name |
+| 409 | Email already registered / Duplicate label name (note, grocery, or item) |
 
 ## Running Tests
 
