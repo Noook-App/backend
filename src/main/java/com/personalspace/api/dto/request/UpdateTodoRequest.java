@@ -1,3 +1,6 @@
+// AI-assisted code generated with ChatGPT.
+// Prompt: Given these repos, help me implement the todos feature.
+
 package com.personalspace.api.dto.request;
 
 import jakarta.validation.constraints.Size;
