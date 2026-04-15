@@ -85,11 +85,11 @@ public class AiService {
         return sb.toString();
     }
 
-    record ChatCompletionRequest(String model, List<ChatMessage> messages) {}
+    private record ChatCompletionRequest(String model, List<ChatMessage> messages) {}
 
-    record ChatMessage(String role, String content) {}
+    private record ChatMessage(String role, String content) {}
 
-    record ChatCompletionResponse(List<Choice> choices) {}
+    private record ChatCompletionResponse(List<Choice> choices) {}
 
-    record Choice(ChatMessage message, @JsonProperty("finish_reason") String finishReason) {}
+    private record Choice(ChatMessage message, @JsonProperty("finish_reason") String finishReason) {}
 }
