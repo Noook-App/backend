@@ -1,0 +1,76 @@
+# CI/CD Pipeline for Noook Backend
+# Runs unit tests, linting, and quality checks on every PR and push to main.
+#
+# AI Disclosure: This workflow was generated with the assistance of Claude (Anthropic).
+# Prompt: "Create a GitHub Actions CI/CD workflow for a Java 21 / Spring Boot / Maven
+# backend that runs unit tests on PRs and pushes to main, reports results clearly,
+# and includes optional linting and static analysis jobs."
+
+name: Backend CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Run tests
+        run: mvn test --batch-mode --fail-at-end
+
+      - name: Publish test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: JUnit Test Results
+          path: target/surefire-reports/*.xml
+          reporter: java-junit
+          fail-on-error: true
+
+      - name: Upload test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports
+          path: target/surefire-reports/
+          retention-days: 14
+
+  lint:
+    name: Checkstyle Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Run Checkstyle via Maven
+        run: mvn checkstyle:check --batch-mode || true
+        # Using || true so lint warnings don't block the pipeline.
+        # Remove "|| true" to enforce lint as a hard gate.
